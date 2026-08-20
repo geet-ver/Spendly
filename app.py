@@ -80,7 +80,7 @@ def register():
 def login():
     if request.method == "GET":
         if "user_id" in session:
-            return redirect(url_for("landing"))
+            return redirect(url_for("profile"))
         return render_template("login.html")
 
     email = request.form.get("email", "").strip()
@@ -93,7 +93,7 @@ def login():
     session.clear()
     session["user_id"] = user["id"]
     session["name"] = user["name"]
-    return redirect(url_for("landing"))
+    return redirect(url_for("profile"))
 
 
 @app.route("/terms")
@@ -106,6 +106,42 @@ def privacy():
     return render_template("privacy.html")
 
 
+@app.route("/profile")
+@login_required
+def profile():
+    user = {
+        "name": "Demo User",
+        "email": "demo@spendly.com",
+        "initials": "DU",
+        "member_since": "August 2026",
+    }
+    stats = {
+        "total_spent": 390.25,
+        "transaction_count": 8,
+        "top_category": "Bills",
+    }
+    transactions = [
+        {"date": "2026-08-16", "description": "Groceries", "category": "Food", "amount": 32.75},
+        {"date": "2026-08-14", "description": "Miscellaneous", "category": "Other", "amount": 15.00},
+        {"date": "2026-08-12", "description": "New shoes", "category": "Shopping", "amount": 80.00},
+        {"date": "2026-08-10", "description": "Movie tickets", "category": "Entertainment", "amount": 25.00},
+        {"date": "2026-08-07", "description": "Pharmacy", "category": "Health", "amount": 60.00},
+    ]
+    categories = [
+        {"name": "Bills", "amount": 120.00, "percent": 31},
+        {"name": "Shopping", "amount": 80.00, "percent": 21},
+        {"name": "Health", "amount": 60.00, "percent": 15},
+        {"name": "Food", "amount": 45.25, "percent": 12},
+        {"name": "Transport", "amount": 45.00, "percent": 11},
+        {"name": "Entertainment", "amount": 25.00, "percent": 6},
+        {"name": "Other", "amount": 15.00, "percent": 4},
+    ]
+    return render_template(
+        "profile.html", user=user, stats=stats,
+        transactions=transactions, categories=categories,
+    )
+
+
 # ------------------------------------------------------------------ #
 # Placeholder routes — students will implement these                  #
 # ------------------------------------------------------------------ #
@@ -115,11 +151,6 @@ def privacy():
 def logout():
     session.clear()
     return redirect(url_for("login"))
-
-
-@app.route("/profile")
-def profile():
-    return "Profile page — coming in Step 4"
 
 
 @app.route("/expenses/add")
