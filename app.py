@@ -1,10 +1,12 @@
 import os
 from functools import wraps
 
-from flask import Flask, render_template, request, redirect, url_for, session
-from werkzeug.security import check_password_hash
+import sqlite3
 
-from database.db import init_db, seed_db, get_user_by_email
+from flask import Flask, render_template, request, redirect, url_for, session
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from database.db import init_db, seed_db, get_user_by_email, create_user
 
 app = Flask(__name__)
 # Dev-only fallback secret; override with the SECRET_KEY env var in real deployments.
@@ -38,11 +40,40 @@ def landing():
     return render_template("landing.html")
 
 
-@app.route("/register")
+@app.route("/register", methods=["GET", "POST"])
 def register():
     if "user_id" in session:
         return redirect(url_for("landing"))
-    return render_template("register.html")
+
+    if request.method == "GET":
+        return render_template("register.html")
+
+    name = request.form.get("name", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+
+    if not name or not email or not password:
+        return render_template("register.html", error="All fields are required.")
+
+    if len(password) < 8:
+        return render_template(
+            "register.html", error="Password must be at least 8 characters."
+        )
+
+    if get_user_by_email(email):
+        return render_template(
+            "register.html", error="An account with that email already exists."
+        )
+
+    password_hash = generate_password_hash(password)
+    try:
+        create_user(name, email, password_hash)
+    except sqlite3.IntegrityError:
+        return render_template(
+            "register.html", error="An account with that email already exists."
+        )
+
+    return redirect(url_for("login"))
 
 
 @app.route("/login", methods=["GET", "POST"])
