@@ -19,6 +19,7 @@ from database.db import (
     insert_expense,
     get_expense_by_id,
     update_expense,
+    delete_expense as delete_expense_row,
     CATEGORIES,
 )
 
@@ -331,9 +332,14 @@ def edit_expense(expense_id):
     return redirect(url_for("profile"))
 
 
-@app.route("/expenses/<int:id>/delete")
-def delete_expense(id):
-    return "Delete expense — coming in Step 9"
+@app.route("/expenses/<int:expense_id>/delete", methods=["POST"])
+@login_required
+def delete_expense(expense_id):
+    expense = get_expense_by_id(expense_id, session["user_id"])
+    if expense is None:
+        abort(404)
+    delete_expense_row(expense_id, session["user_id"])
+    return redirect(url_for("profile"))
 
 
 if __name__ == "__main__":
