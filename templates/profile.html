@@ -64,7 +64,10 @@
         </div>
 
         <div class="profile-card">
-            <h2 class="profile-card-title">Recent transactions</h2>
+            <div class="profile-card-header">
+                <h2 class="profile-card-title">Recent transactions</h2>
+                <a href="{{ url_for('add_expense') }}" class="btn-primary">Add Expense</a>
+            </div>
             <div class="table-scroll">
                 <table class="table">
                     <thead>
