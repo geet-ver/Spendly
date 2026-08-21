@@ -1,3 +1,4 @@
+import math
 import os
 import sqlite3
 
@@ -95,3 +96,65 @@ def seed_db():
     )
     conn.commit()
     conn.close()
+
+
+def get_user_by_id(user_id):
+    conn = get_db()
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    return user
+
+
+def get_summary_stats(user_id):
+    conn = get_db()
+    totals = conn.execute(
+        "SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt "
+        "FROM expenses WHERE user_id = ?", (user_id,),
+    ).fetchone()
+    top = conn.execute(
+        "SELECT category, SUM(amount) AS total FROM expenses "
+        "WHERE user_id = ? GROUP BY category ORDER BY total DESC LIMIT 1",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    return {
+        "total_spent": totals["total"],
+        "transaction_count": totals["cnt"],
+        "top_category": top["category"] if top else "—",
+    }
+
+
+def get_recent_transactions(user_id, limit=10):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT date, description, category, amount FROM expenses "
+        "WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT ?",
+        (user_id, limit),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_category_breakdown(user_id):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT category, SUM(amount) AS amount FROM expenses "
+        "WHERE user_id = ? GROUP BY category ORDER BY amount DESC",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    if not rows:
+        return []
+    total = sum(r["amount"] for r in rows)
+    breakdown = [
+        {
+            "name": r["category"],
+            "amount": r["amount"],
+            "percent": math.floor((r["amount"] / total) * 100 + 0.5),
+        }
+        for r in rows
+    ]
+    remainder = 100 - sum(c["percent"] for c in breakdown)
+    if remainder:
+        max(breakdown, key=lambda c: c["amount"])["percent"] += remainder
+    return breakdown
