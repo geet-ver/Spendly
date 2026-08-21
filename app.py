@@ -16,6 +16,8 @@ from database.db import (
     get_summary_stats,
     get_recent_transactions,
     get_category_breakdown,
+    insert_expense,
+    CATEGORIES,
 )
 
 app = Flask(__name__)
@@ -222,6 +224,12 @@ def profile():
     )
 
 
+@app.route("/analytics")
+@login_required
+def analytics():
+    return render_template("analytics.html")
+
+
 # ------------------------------------------------------------------ #
 # Placeholder routes — students will implement these                  #
 # ------------------------------------------------------------------ #
@@ -233,9 +241,58 @@ def logout():
     return redirect(url_for("login"))
 
 
-@app.route("/expenses/add")
+def validate_expense_form(form):
+    """Returns (cleaned, error). cleaned is a dict of validated fields on
+    success; error is a user-facing message on failure."""
+    amount_raw = form.get("amount", "")
+    category = form.get("category", "")
+    date_raw = form.get("date", "")
+    description = form.get("description", "").strip() or None
+
+    try:
+        amount = float(amount_raw)
+        if amount <= 0:
+            return None, "Amount must be greater than zero."
+    except ValueError:
+        return None, "Please enter a valid amount."
+
+    if category not in CATEGORIES:
+        return None, "Please select a valid category."
+
+    try:
+        datetime.strptime(date_raw, "%Y-%m-%d")
+    except ValueError:
+        return None, "Please enter a valid date."
+
+    return {
+        "amount": amount, "category": category,
+        "date": date_raw, "description": description,
+    }, None
+
+
+@app.route("/expenses/add", methods=["GET", "POST"])
+@login_required
 def add_expense():
-    return "Add expense — coming in Step 7"
+    if request.method == "GET":
+        return render_template(
+            "add_expense.html", categories=CATEGORIES, date=date.today().isoformat()
+        )
+
+    cleaned, error = validate_expense_form(request.form)
+    if error:
+        return render_template(
+            "add_expense.html", categories=CATEGORIES, error=error,
+            amount=request.form.get("amount", ""),
+            category=request.form.get("category", ""),
+            date=request.form.get("date", ""),
+            description=request.form.get("description", ""),
+        )
+
+    insert_expense(
+        session["user_id"], cleaned["amount"], cleaned["category"],
+        cleaned["date"], cleaned["description"],
+    )
+    return redirect(url_for("profile"))
 
 
 @app.route("/expenses/<int:id>/edit")
