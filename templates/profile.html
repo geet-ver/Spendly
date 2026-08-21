@@ -20,6 +20,34 @@
             </div>
         </div>
 
+        <div class="profile-card filter-bar">
+            {% if error %}
+            <div class="auth-error filter-error">{{ error }}</div>
+            {% endif %}
+
+            <div class="filter-presets">
+                {% for preset in presets %}
+                <a href="{{ url_for('profile', date_from=preset.date_from, date_to=preset.date_to) }}"
+                   class="filter-chip {% if preset.key == active_preset %}is-active{% endif %}">
+                    {{ preset.label }}
+                </a>
+                {% endfor %}
+            </div>
+
+            <form method="GET" action="{{ url_for('profile') }}"
+                  class="filter-custom {% if active_preset == 'custom' %}is-active{% endif %}">
+                <div class="filter-custom-field">
+                    <label for="date_from">From</label>
+                    <input type="date" id="date_from" name="date_from" class="form-input" value="{{ filter_from }}">
+                </div>
+                <div class="filter-custom-field">
+                    <label for="date_to">To</label>
+                    <input type="date" id="date_to" name="date_to" class="form-input" value="{{ filter_to }}">
+                </div>
+                <button type="submit" class="btn-ghost filter-apply">Apply</button>
+            </form>
+        </div>
+
         <div class="dashboard-stats profile-stats">
             <div class="stat-card">
                 <span class="stat-label">Total spent</span>
