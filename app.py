@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from functools import wraps
 
 import sqlite3
@@ -6,7 +7,16 @@ import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from database.db import init_db, seed_db, get_user_by_email, create_user
+from database.db import (
+    init_db,
+    seed_db,
+    get_user_by_email,
+    create_user,
+    get_user_by_id,
+    get_summary_stats,
+    get_recent_transactions,
+    get_category_breakdown,
+)
 
 app = Flask(__name__)
 # Dev-only fallback secret; override with the SECRET_KEY env var in real deployments.
@@ -106,36 +116,30 @@ def privacy():
     return render_template("privacy.html")
 
 
+def _initials(name):
+    parts = name.split()
+    if len(parts) >= 2:
+        return (parts[0][0] + parts[1][0]).upper()
+    return (parts[0][:2] if parts else "?").upper()
+
+
+def _format_member_since(created_at):
+    return datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S").strftime("%B %Y")
+
+
 @app.route("/profile")
 @login_required
 def profile():
+    user_row = get_user_by_id(session["user_id"])
     user = {
-        "name": "Demo User",
-        "email": "demo@spendly.com",
-        "initials": "DU",
-        "member_since": "August 2026",
+        "name": user_row["name"],
+        "email": user_row["email"],
+        "initials": _initials(user_row["name"]),
+        "member_since": _format_member_since(user_row["created_at"]),
     }
-    stats = {
-        "total_spent": 390.25,
-        "transaction_count": 8,
-        "top_category": "Bills",
-    }
-    transactions = [
-        {"date": "2026-08-16", "description": "Groceries", "category": "Food", "amount": 32.75},
-        {"date": "2026-08-14", "description": "Miscellaneous", "category": "Other", "amount": 15.00},
-        {"date": "2026-08-12", "description": "New shoes", "category": "Shopping", "amount": 80.00},
-        {"date": "2026-08-10", "description": "Movie tickets", "category": "Entertainment", "amount": 25.00},
-        {"date": "2026-08-07", "description": "Pharmacy", "category": "Health", "amount": 60.00},
-    ]
-    categories = [
-        {"name": "Bills", "amount": 120.00, "percent": 31},
-        {"name": "Shopping", "amount": 80.00, "percent": 21},
-        {"name": "Health", "amount": 60.00, "percent": 15},
-        {"name": "Food", "amount": 45.25, "percent": 12},
-        {"name": "Transport", "amount": 45.00, "percent": 11},
-        {"name": "Entertainment", "amount": 25.00, "percent": 6},
-        {"name": "Other", "amount": 15.00, "percent": 4},
-    ]
+    stats = get_summary_stats(session["user_id"])
+    transactions = get_recent_transactions(session["user_id"])
+    categories = get_category_breakdown(session["user_id"])
     return render_template(
         "profile.html", user=user, stats=stats,
         transactions=transactions, categories=categories,
