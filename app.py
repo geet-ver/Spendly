@@ -4,7 +4,7 @@ from functools import wraps
 
 import sqlite3
 
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, abort
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database.db import (
@@ -17,6 +17,8 @@ from database.db import (
     get_recent_transactions,
     get_category_breakdown,
     insert_expense,
+    get_expense_by_id,
+    update_expense,
     CATEGORIES,
 )
 
@@ -270,6 +272,15 @@ def validate_expense_form(form):
     }, None
 
 
+def _expense_form_values(form):
+    return {
+        "amount": form.get("amount", ""),
+        "category": form.get("category", ""),
+        "date": form.get("date", ""),
+        "description": form.get("description", ""),
+    }
+
+
 @app.route("/expenses/add", methods=["GET", "POST"])
 @login_required
 def add_expense():
@@ -282,10 +293,7 @@ def add_expense():
     if error:
         return render_template(
             "add_expense.html", categories=CATEGORIES, error=error,
-            amount=request.form.get("amount", ""),
-            category=request.form.get("category", ""),
-            date=request.form.get("date", ""),
-            description=request.form.get("description", ""),
+            **_expense_form_values(request.form),
         )
 
     insert_expense(
@@ -295,9 +303,32 @@ def add_expense():
     return redirect(url_for("profile"))
 
 
-@app.route("/expenses/<int:id>/edit")
-def edit_expense(id):
-    return "Edit expense — coming in Step 8"
+@app.route("/expenses/<int:expense_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_expense(expense_id):
+    expense = get_expense_by_id(expense_id, session["user_id"])
+    if expense is None:
+        abort(404)
+
+    if request.method == "GET":
+        return render_template(
+            "edit_expense.html", expense=expense, categories=CATEGORIES,
+            amount=expense["amount"], category=expense["category"],
+            date=expense["date"], description=expense["description"],
+        )
+
+    cleaned, error = validate_expense_form(request.form)
+    if error:
+        return render_template(
+            "edit_expense.html", expense=expense, categories=CATEGORIES, error=error,
+            **_expense_form_values(request.form),
+        )
+
+    update_expense(
+        expense_id, session["user_id"], cleaned["amount"], cleaned["category"],
+        cleaned["date"], cleaned["description"],
+    )
+    return redirect(url_for("profile"))
 
 
 @app.route("/expenses/<int:id>/delete")
