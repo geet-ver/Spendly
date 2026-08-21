@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import date, datetime
 from functools import wraps
 
 import sqlite3
@@ -127,6 +127,71 @@ def _format_member_since(created_at):
     return datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S").strftime("%B %Y")
 
 
+def _parse_iso_date(value):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _shift_months(d, months_back):
+    # year*12 + (month-1) turns a (year, month) pair into a zero-based month
+    # count, so subtracting months_back and re-splitting with divmod lands on
+    # the first of the target month without a calendar library.
+    total = d.year * 12 + (d.month - 1) - months_back
+    year, month0 = divmod(total, 12)
+    return date(year, month0 + 1, 1)
+
+
+def _build_presets(today):
+    return [
+        {"key": "this_month", "label": "This Month",
+         "date_from": today.replace(day=1), "date_to": today},
+        {"key": "last_3_months", "label": "Last 3 Months",
+         "date_from": _shift_months(today, 2), "date_to": today},
+        {"key": "last_6_months", "label": "Last 6 Months",
+         "date_from": _shift_months(today, 5), "date_to": today},
+        {"key": "all_time", "label": "All Time",
+         "date_from": None, "date_to": None},
+    ]
+
+
+def _match_preset(presets, date_from_str, date_to_str):
+    for preset in presets:
+        preset_from = preset["date_from"].isoformat() if preset["date_from"] else None
+        preset_to = preset["date_to"].isoformat() if preset["date_to"] else None
+        if preset_from == date_from_str and preset_to == date_to_str:
+            return preset["key"]
+    return "custom" if date_from_str else "all_time"
+
+
+def _resolve_date_filter(args, presets):
+    """Reads date_from/date_to from request.args and returns
+    (date_from_str, date_to_str, active_preset, raw_from, raw_to, error)."""
+    raw_from = args.get("date_from", "").strip()
+    raw_to = args.get("date_to", "").strip()
+    parsed_from = _parse_iso_date(raw_from)
+    parsed_to = _parse_iso_date(raw_to)
+
+    error = None
+    if parsed_from and parsed_to:
+        if parsed_from > parsed_to:
+            error = "Start date must be before end date."
+            active_from, active_to = None, None
+        else:
+            active_from, active_to = parsed_from, parsed_to
+    else:
+        active_from, active_to = None, None
+
+    date_from_str = active_from.isoformat() if active_from else None
+    date_to_str = active_to.isoformat() if active_to else None
+    active_preset = _match_preset(presets, date_from_str, date_to_str)
+
+    return date_from_str, date_to_str, active_preset, raw_from, raw_to, error
+
+
 @app.route("/profile")
 @login_required
 def profile():
@@ -137,12 +202,23 @@ def profile():
         "initials": _initials(user_row["name"]),
         "member_since": _format_member_since(user_row["created_at"]),
     }
-    stats = get_summary_stats(session["user_id"])
-    transactions = get_recent_transactions(session["user_id"])
-    categories = get_category_breakdown(session["user_id"])
+
+    presets = _build_presets(date.today())
+    date_from_str, date_to_str, active_preset, raw_from, raw_to, error = (
+        _resolve_date_filter(request.args, presets)
+    )
+
+    stats = get_summary_stats(session["user_id"], date_from_str, date_to_str)
+    transactions = get_recent_transactions(
+        session["user_id"], date_from=date_from_str, date_to=date_to_str
+    )
+    categories = get_category_breakdown(session["user_id"], date_from_str, date_to_str)
+
     return render_template(
         "profile.html", user=user, stats=stats,
         transactions=transactions, categories=categories,
+        presets=presets, active_preset=active_preset,
+        filter_from=raw_from, filter_to=raw_to, error=error,
     )
 
 

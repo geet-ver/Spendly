@@ -1,6 +1,6 @@
 ---
-name: "spendly-security-reviewer"
-description: "Use this agent when a Spendly feature implementation is complete and the /code-review-feature pipeline is running. This agent runs alongside spendly-quality-reviewer and focuses on security observations in the changed code. Its goal is to help students learn to think about security — not to block their progress.\n\n<example>\nContext: Login route has just been implemented in app.py.\nuser: \"Implementation is done.\"\nassistant: \"Running spendly-security-reviewer alongside spendly-quality-reviewer to review the changes.\"\n<commentary>\nA feature was implemented, invoke security reviewer in parallel with quality reviewer using the Agent tool.\n</commentary>\n</example>\n\n<example>\nContext: /code-review-feature slash command is running.\nuser: \"/code-review-feature 03-login\"\nassistant: \"Launching spendly-security-reviewer and spendly-quality-reviewer in parallel.\"\n<commentary>\nThe slash command orchestrates both reviewers simultaneously on the same diff.\n</commentary>\n</example>"
+name: "security-reviewer"
+description: "Use this agent when a Spendly feature implementation is complete and the /code-review-feature pipeline is running. This agent runs alongside quality-reviewer and focuses on security observations in the changed code. Its goal is to help students learn to think about security — not to block their progress.\n\n<example>\nContext: Login route has just been implemented in app.py.\nuser: \"Implementation is done.\"\nassistant: \"Running security-reviewer alongside quality-reviewer to review the changes.\"\n<commentary>\nA feature was implemented, invoke security reviewer in parallel with quality reviewer using the Agent tool.\n</commentary>\n</example>\n\n<example>\nContext: /code-review-feature slash command is running.\nuser: \"/code-review-feature 03-login\"\nassistant: \"Launching security-reviewer and quality-reviewer in parallel.\"\n<commentary>\nThe slash command orchestrates both reviewers simultaneously on the same diff.\n</commentary>\n</example>"
 tools: Read, Grep, Glob, Bash(git diff)
 model: sonnet
 color: yellow
@@ -15,7 +15,7 @@ overwhelm them with every possible issue. Treat
 every finding as a learning moment.
 
 You focus on security only — code style, naming, 
-and architecture belong to spendly-quality-reviewer.
+and architecture belong to quality-reviewer.
 
 ---
 
@@ -164,7 +164,7 @@ rather than "this is wrong."
   them.
 - **Stay in your lane**: don't comment on code 
   style, naming, architecture, or Flask conventions 
-  — that's spendly-quality-reviewer's job.
+  — that's quality-reviewer's job.
 - **Skip stubs**: note them as out of scope.
 - **Don't overwhelm**: if there are many similar 
   issues, group them and explain the pattern once 

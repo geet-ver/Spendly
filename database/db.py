@@ -105,16 +105,26 @@ def get_user_by_id(user_id):
     return user
 
 
-def get_summary_stats(user_id):
+def _user_date_filter(user_id, date_from, date_to):
+    where = "WHERE user_id = ?"
+    params = [user_id]
+    if date_from and date_to:
+        where += " AND date BETWEEN ? AND ?"
+        params += [date_from, date_to]
+    return where, params
+
+
+def get_summary_stats(user_id, date_from=None, date_to=None):
     conn = get_db()
+    where, params = _user_date_filter(user_id, date_from, date_to)
     totals = conn.execute(
-        "SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt "
-        "FROM expenses WHERE user_id = ?", (user_id,),
+        f"SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt FROM expenses {where}",
+        params,
     ).fetchone()
     top = conn.execute(
-        "SELECT category, SUM(amount) AS total FROM expenses "
-        "WHERE user_id = ? GROUP BY category ORDER BY total DESC LIMIT 1",
-        (user_id,),
+        f"SELECT category, SUM(amount) AS total FROM expenses {where} "
+        "GROUP BY category ORDER BY total DESC LIMIT 1",
+        params,
     ).fetchone()
     conn.close()
     return {
@@ -124,23 +134,26 @@ def get_summary_stats(user_id):
     }
 
 
-def get_recent_transactions(user_id, limit=10):
+def get_recent_transactions(user_id, date_from=None, date_to=None, limit=10):
     conn = get_db()
+    where, params = _user_date_filter(user_id, date_from, date_to)
+    params.append(limit)
     rows = conn.execute(
-        "SELECT date, description, category, amount FROM expenses "
-        "WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT ?",
-        (user_id, limit),
+        f"SELECT date, description, category, amount FROM expenses {where} "
+        "ORDER BY date DESC, id DESC LIMIT ?",
+        params,
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def get_category_breakdown(user_id):
+def get_category_breakdown(user_id, date_from=None, date_to=None):
     conn = get_db()
+    where, params = _user_date_filter(user_id, date_from, date_to)
     rows = conn.execute(
-        "SELECT category, SUM(amount) AS amount FROM expenses "
-        "WHERE user_id = ? GROUP BY category ORDER BY amount DESC",
-        (user_id,),
+        f"SELECT category, SUM(amount) AS amount FROM expenses {where} "
+        "GROUP BY category ORDER BY amount DESC",
+        params,
     ).fetchall()
     conn.close()
     if not rows:
